@@ -1,8 +1,6 @@
 import express from "express";
-import { users } from "./data/users";
-import * as fs from "fs/promises";
-import * as path from "path";
 import { User } from "./data/user-type";
+import db from "./data/db";
 
 const app = express();
 const port = 3000;
@@ -10,28 +8,50 @@ const port = 3000;
 // Middleware for parsing JSON bodies
 app.use(express.json());
 
-// GET /api/users
+// Prepare statements once
+const getAllUsers = db.prepare("SELECT * FROM users");
+const insertUser = db.prepare("INSERT INTO users (name, email) VALUES (?, ?)");
+
 app.get("/api/users", (req, res) => {
-  res.json(users);
+  try {
+    const users = getAllUsers.all();
+    res.json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
 });
 
-// POST /api/users
-app.post("/api/users", async (req, res) => {
-  const newUser: User = {
-    id: users.length + 1,
-    name: req.body.name,
-    email: req.body.email,
-  };
+//@ts-ignore
+app.post("/api/users", (req, res) => {
+  const { name, email } = req.body;
 
-  users.push(newUser);
-  const usersFilePath = path.join(__dirname, "data", "users.ts");
+  // Input validation
+  if (!name || !email) {
+    return res.status(400).json({ error: "Name and email are required" });
+  }
+
+  if (typeof name !== "string" || typeof email !== "string") {
+    return res.status(400).json({ error: "Name and email must be strings" });
+  }
 
   try {
-    await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2), "utf8");
+    console.log("Attempting to insert user:", { name, email });
+    const result = insertUser.run(name, email);
+    console.log("Insert result:", result);
+
+    const newUser: User = {
+      id: result.lastInsertRowid as number,
+      name,
+      email,
+    };
+
     res.status(201).json(newUser);
   } catch (error) {
-    console.error("Error writing to users.ts:", error);
-    res.status(500).json({ error: "Failed to update users file" });
+    console.error("Error inserting user:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: errorMessage });
   }
 });
 

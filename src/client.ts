@@ -13,8 +13,8 @@ async function testApi() {
     // POST /api/users
     console.log("\nCreating a new user...");
     const newUser = {
-      name: "Smit Raghani",
-      email: "smit@example.com",
+      name: "Shreya Jain",
+      email: "shreya@example.com",
     };
 
     const createResponse = await axios.post<User>(`${API_URL}/users`, newUser);
